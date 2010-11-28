@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="utf-8"?>
+<components:Window showStatusBar="false" creationComplete="init()" xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:components="spark.components.*" width="1024" height="768">
+
+	<components:layout><s:BasicLayout /></components:layout>
+		
+	<fx:Script>
+		<![CDATA[
+			import com.greensock.TweenMax;
+			import com.turningtech.poll.PollService;
+			import com.turningtech.poll.event.ResponseEvent;
+			
+			import mx.containers.Canvas;
+			import mx.events.ResizeEvent;
+			import mx.managers.PopUpManager;
+			
+			import org.gapminder.DatabaseController;
+			import org.gapminder.QuestionPair;
+			
+			import spark.components.TextInput;
+			import spark.components.TitleWindow;
+			import spark.components.Window;
+			
+			//Modal Window
+			private var _modalWindow:TitleWindow;
+			
+			//response
+			private var sdk:PollService;
+			private var isPolling:Boolean = false;
+			
+			private var timer:Timer;
+			
+			private var answers:Object = {};
+			private var _questionPairs:Array = [];
+			private var activeQuestionPair:QuestionPair;
+			private var _isFinished:Boolean = false;
+			
+			[Bindable]
+			public var _activeQuestion:Number = -1;
+			
+			[Bindable]
+			public var rCount:int = 0;
+			
+			//questions
+			public var chimpQuestions:Array = [];
+			public var percentagesAlt1:Array = [];
+			
+			public var databaseController:DatabaseController = new DatabaseController();
+			
+				
+			protected function init():void
+			{
+				
+				
+				//Poll
+				sdk = PollService.getInstance();
+				sdk.addEventListener(ResponseEvent.RESPONSE, handleResponse);
+				
+				// Center window on the screen
+				nativeWindow.x = (Capabilities.screenResolutionX - nativeWindow.width) / 2;
+				nativeWindow.y = (Capabilities.screenResolutionY - nativeWindow.height) / 2;
+				this.addEventListener(ResizeEvent.RESIZE, resizeHandler);
+				
+				//Graphics
+				var graphics:ChimpGraphics_design = new ChimpGraphics_design();
+				graphicsHolder.addChild(graphics);
+				
+				
+				//Init Chimp test
+				chimpQuestions = databaseController.getQuestions();
+				
+				var i:Number = 0;
+				
+				for each(var question:Object in chimpQuestions)
+				{
+					//New pairs
+					var questionPair:QuestionPair = new QuestionPair(question.alt1, question.alt2);
+					questionPair.y = i*70;
+					questionPair.originalY = questionPair.y;
+					questionPair.x = 0;
+					questionPair.scaleX = 0.8;
+					questionPair.scaleY = 0.8;
+					
+					_questionPairs.push(questionPair);			
+					questionHolder.addChild(questionPair);
+					i++;
+				}
+				
+				//Add Listeners
+				startPoll.addEventListener(MouseEvent.CLICK, startPolling);
+				next.addEventListener(MouseEvent.CLICK, firstQuestion);
+				
+				openModalWindow();
+				
+			}
+			
+			private function resizeHandler(e:ResizeEvent){
+				
+				var defaultWidth = 1024;
+				var defaultHeight = 768;
+				
+				var stageHeight = this.height;
+				var stageWidth = this.width;
+				
+				//Resize questionHolder
+				var scale = stageHeight/defaultHeight;
+				questionHolder.scaleX = scale;
+				questionHolder.scaleY = scale;
+
+				graphicsHolder.scaleX = scale;
+				graphicsHolder.scaleY = scale;
+				
+				trace(questionHolder.height);
+				
+				//700
+				
+				
+				//questionHolder.height = this.height;
+			}
+			
+			
+			public function firstQuestion(e=null){
+				next.removeEventListener(MouseEvent.CLICK, firstQuestion);
+				next.addEventListener(MouseEvent.CLICK, endQuestion);
+				nextQuestion();
+			}
+			
+	
+			private function nextQuestion():void {
+				
+				_activeQuestion++;
+				clearResponseCount();
+				activeQuestionPair = _questionPairs[_activeQuestion];
+				
+				if(!_isFinished) {
+					
+					activeQuestionPair.tweenToActive();
+
+					startPoll.visible = true;
+					responseCount.visible = true;
+					startPolling();
+					
+					var i:int = 0;
+					for each(var questionPair:Object in _questionPairs) {
+						if(i != _activeQuestion) {			
+							TweenMax.to(questionPair,0.2,{alpha:0});
+						}
+						i++;
+					}
+				
+					
+					if(_activeQuestion == chimpQuestions.length-1) {
+						_isFinished = true;
+					}
+					
+				}
+					
+				else {
+					
+					for each(var questionPair:Object in _questionPairs) {
+						questionPair.gotoAndStop(1);
+						questionPair.alt1.textColor = "0x000000";
+						questionPair.alt2.textColor = "0x000000";
+						
+					}
+					initResults()
+					
+				}
+				
+			}
+			
+			
+			
+			private function endQuestion(e:MouseEvent):void {
+				
+				if(isPolling) stopPolling();
+				startPoll.visible = false;
+				responseCount.visible = false;
+				
+				activeQuestionPair.tweenBack();
+
+				for each(var questionPair:Object in _questionPairs) {
+						TweenMax.to(questionPair,0.5,{alpha:1, delay:0.6});
+				}	
+				
+				var percentageAlt1:Number = databaseController.handleAnswers(answers, chimpQuestions[_activeQuestion].id, chimpQuestions[_activeQuestion].correct); //send all answers, question ID and correct
+				
+				percentagesAlt1.push(percentageAlt1);
+				
+				answers = new Object();
+				
+				TweenMax.delayedCall(2,nextQuestion);
+			}
+			
+			
+			
+			public function openModalWindow():void
+			{
+				
+				//define title window
+				_modalWindow = new TitleWindow();
+				_modalWindow.title = "Group name";
+				
+				//define and add canvas
+				var _tmpCanvas:Canvas = new Canvas();
+				_tmpCanvas.height = 100;
+				_tmpCanvas.width = 200;
+				_modalWindow.addElement(_tmpCanvas);
+				
+				//define and add label
+				var _uniqueGroupText:TextInput = new TextInput();
+				_uniqueGroupText.name = "uniqueGroupText";
+				_uniqueGroupText.left = 10;
+				_uniqueGroupText.top = 10;
+				_tmpCanvas.addElement(_uniqueGroupText);
+				
+				var okButton:Button = new Button();
+				okButton.label = "OK";
+				okButton.bottom = 10;
+				okButton.right = 10;
+				okButton.addEventListener(MouseEvent.CLICK, closeModalWindow);
+				
+				_tmpCanvas.addElement(okButton);
+				
+				//add modal window
+				PopUpManager.addPopUp(_modalWindow, this,true);
+				//center modal window
+				PopUpManager.centerPopUp(_modalWindow);
+				
+				function closeModalWindow(e:MouseEvent){
+					
+					if(_uniqueGroupText.text != "") {
+						databaseController.uniqueGroup = _uniqueGroupText.text;
+						PopUpManager.removePopUp(_modalWindow);
+					}
+					
+				}
+			}
+			
+			
+			private function toggleFullScreen():void {
+				if (stage.displayState == StageDisplayState.FULL_SCREEN) {
+					stage.displayState = StageDisplayState.NORMAL;
+					fullScreen.label = "Fullscreen";
+				} else {
+					stage.displayState = StageDisplayState.FULL_SCREEN;
+					fullScreen.label = "Exit Fullscreen";
+				}
+			}
+
+
+			
+			private function startPolling(e=null){
+				isPolling = true;
+				timer = new Timer(1000,0);
+				timer.addEventListener(TimerEvent.TIMER, updatePoll);
+				timer.start();
+				sdk.startPolling();
+				startPoll.label = "Stop poll";
+				startPoll.setStyle("chromeColor", "0xff00000");
+				startPoll.removeEventListener(MouseEvent.CLICK, startPolling);
+				startPoll.addEventListener(MouseEvent.CLICK, stopPolling);
+			}
+			
+			private function updatePoll(e:TimerEvent){
+				
+				var total:int = 0;
+				var totalAlt1:int = 0;
+				var totalAlt2:int = 0;
+				
+				for each(var response:String in answers) {
+					if(response == "1") {
+						totalAlt1++;
+					}
+					else{
+						totalAlt2++;
+					}
+					
+				}
+	
+				total = totalAlt1 + totalAlt2;
+				var percentageAlt1:Number = totalAlt1/total;
+				var percentageAlt2:Number = totalAlt2/total;
+				
+				if(total > 0){
+				activeQuestionPair.update(percentageAlt1, percentageAlt2);
+				}
+				
+			}
+			
+			
+			private function stopPolling(e=null){
+				sdk.stopPolling();
+				startPoll.label = "Start poll";
+				startPoll.setStyle("chromeColor", "0x46AA48");
+				startPoll.removeEventListener(MouseEvent.CLICK, stopPolling);
+				startPoll.addEventListener(MouseEvent.CLICK, startPolling);
+				
+			}
+			
+			
+			//RESULTS in %
+			
+			private function initResults(){
+				
+				TweenMax.allTo([startPoll,responseCount],0.2,{autoAlpha: 0});
+				_activeQuestion = 0;
+				
+				/* var alt1Array:Array = new Array();
+				var alt2Array:Array = new Array();
+				
+				for each (var question:MovieClip in _questionPairs) {
+					alt1Array.push(question.alt1);
+					alt2Array.push(question.alt2);
+				}
+				
+				TweenMax.allTo(alt1Array, 0.2, {x:"-60"}, 0.05);
+				TweenMax.allTo(alt2Array, 0.2, {x:"+60"}, 0.05); 
+				*/ 
+				//next.label = "Show next result";
+				
+				next.removeEventListener(MouseEvent.CLICK, endQuestion);
+				next.addEventListener(MouseEvent.CLICK, nextResultHandler);
+			}
+			
+			private function nextResultHandler(e:MouseEvent){
+				
+				if(_activeQuestion < chimpQuestions.length) {
+				
+				markCorrectAnswer();
+					
+				/* var percentageAlt1:Number = percentagesAlt1[_activeQuestion];
+			
+				_questionPairs[_activeQuestion].showResult(percentageAlt1);
+				
+				_questionPairs[_activeQuestion].alt1.textColor = "0x000000";
+				_questionPairs[_activeQuestion].alt2.textColor = "0x000000";
+				
+				
+				
+				
+				next.removeEventListener(MouseEvent.CLICK, nextResultHandler);
+				next.addEventListener(MouseEvent.CLICK, markCorrectAnswer);
+
+				*/
+				}
+				
+				else{
+					bestScore.visible = true;
+					bestScore.text = "Highest score: " + databaseController.getBest().toString();
+						
+					averageScore.visible = true;
+					averageScore.text = "Average : " + databaseController.getAverage().toString() + " of 8";
+					
+				
+				}
+				
+			}
+			
+			private function markCorrectAnswer(){
+				if(chimpQuestions[_activeQuestion].correct == 1) {
+					_questionPairs[_activeQuestion].alt1.textColor = 0x006600;
+					_questionPairs[_activeQuestion].result1.percent.textColor = 0x006600;
+					
+					_questionPairs[_activeQuestion].alt2.alpha = 0.2;
+					_questionPairs[_activeQuestion].result2.percent.alpha = 0.2;
+				}
+					
+				else{
+					_questionPairs[_activeQuestion].alt2.textColor = 0x006600;
+					_questionPairs[_activeQuestion].result2.percent.textColor = 0x006600;
+					
+					_questionPairs[_activeQuestion].alt1.alpha = 0.2;
+					_questionPairs[_activeQuestion].result1.percent.alpha = 0.2;
+				}
+				
+				//next.removeEventListener(MouseEvent.CLICK, markCorrectAnswer);
+				//next.addEventListener(MouseEvent.CLICK, nextResultHandler);
+				
+				_activeQuestion++;
+			
+			}
+			
+			
+			
+			public function clearResponseCount():void {
+				rCount = 0;
+			}
+
+			//RESPONSE
+			
+			private function handleResponse(event:ResponseEvent):void {
+				
+				var response:String = event.response;
+				var user:String = event.responseCardId;
+				
+				if(response == "1" || response == "2") {
+					
+					if(!(user in answers)) {
+						answers[user] = response;
+						rCount++;
+					}
+					else{
+						answers[user] = response;
+					}
+					
+					
+				}
+
+			}
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	<mx:Image source="assets/images/gapminder_interactive_01.jpg"/>
+	<s:Button fontSize="10" label	="Fullscreen" id="fullScreen" click="toggleFullScreen()" right="10" top="5" />
+	<mx:HRule x="0" y="50" width="100%"/>
+	<s:Group top="80" horizontalCenter="0">
+		<s:layout>
+			<s:VerticalLayout gap="5"> 
+			</s:VerticalLayout>
+		</s:layout> 
+		<s:SpriteVisualElement id="graphicsHolder" height="60" width="1" />
+		<s:SpriteVisualElement id="questionHolder" height="50" width="1" />
+	</s:Group>
+	
+			
+			<s:Button label="Start poll" visible="false" id="startPoll" right="120" bottom="20" chromeColor="#46AA48" width="100" height="30" fontSize="15" color="#FFFFFF"/>
+			<s:Button label="Next" id="next" right="20" bottom="20" width="80" height="30" fontSize="15" color="#FFFFFF" chromeColor="#46AA48"/>
+			<s:Label text="{rCount} responses" visible="false" id="responseCount" fontSize="25" bottom="73" right="23" width="215" textAlign="right"/>
+			<s:Label text="Best" bottom="20" fontSize="45" left="30" id="bestScore" visible="false" />
+			<s:Label text="Average" bottom="20" fontSize="45" left="400" id="averageScore" visible="false" />
+		
+</components:Window>

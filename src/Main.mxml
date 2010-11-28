@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication showStatusBar="false" width="600" height="400" xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:samples="samples.*"
+					   applicationComplete="init()" backgroundColor="#ffffff">
+	<s:layout>
+		<s:BasicLayout>
+			
+		</s:BasicLayout>
+	</s:layout>
+	<fx:Style source="Main_2.css"/>
+	
+		
+	<fx:Script>
+		<![CDATA[
+			import com.turningtech.poll.PollService;
+			import com.turningtech.poll.event.LicenseEvent;
+			import com.turningtech.poll.event.PollEvent;
+			import com.turningtech.poll.event.ReceiverChannelEvent;
+			import com.turningtech.poll.event.ReceiverListEvent;
+			import com.turningtech.poll.event.ResponseEvent;
+			
+			import mx.collections.ArrayCollection;
+			
+			private var sdk:PollService;
+			
+
+			
+			protected function init():void
+			{
+			
+				
+				trace("bb")
+				var file:File = File.applicationDirectory;
+				file = file.resolvePath("NativeApps");
+
+				if (Capabilities.os.toLowerCase().indexOf("win") > -1)
+				{
+					file = file.resolvePath("Windows/bin/echoTestWin.exe");
+				}
+				else if (Capabilities.os.toLowerCase().indexOf("mac") > -1)
+				{
+					file = file.resolvePath("Mac/PollingSupport.app/Contents/MacOS/JavaApplicationStub");
+				}
+				
+				
+				trace("aa" + file.exists)
+							
+				var nativeProcessStartupInfo:NativeProcessStartupInfo = new NativeProcessStartupInfo();
+				nativeProcessStartupInfo.executable = file;
+				
+				var process = new NativeProcess();
+				process.start(nativeProcessStartupInfo)
+				
+				
+				sdk = new PollService();
+				
+				sdk.addEventListener(LicenseEvent.VALID, handleLicenseEvent);
+				sdk.addEventListener(LicenseEvent.INVALID, handleLicenseEvent);
+				
+				sdk.addEventListener(PollEvent.STARTED, handlePollEvent);
+				sdk.addEventListener(PollEvent.STOPPED , handlePollEvent);
+				sdk.addEventListener(PollEvent.ERROR, handlePollEvent);
+				
+				sdk.addEventListener(ReceiverChannelEvent.CHANGED, handleReceiverChannelEvent);
+				sdk.addEventListener(ReceiverChannelEvent.ERROR, handleReceiverChannelEvent);
+				
+				sdk.addEventListener(ReceiverListEvent.ALL_DATA, handleReceiverData);
+				sdk.addEventListener(ReceiverListEvent.ERROR, handleReceiverError);
+				
+				
+				if (!sdk.isConnected) {
+					sdk.start();
+				}
+				
+				connect("Gapminder", "02E4CCE2181AF744826B90FD56138892");
+				
+				
+				
+				
+				// Center main AIR app window on the screen
+				nativeWindow.x = (Capabilities.screenResolutionX - nativeWindow.width) / 2;
+				nativeWindow.y = (Capabilities.screenResolutionY - nativeWindow.height) / 2;
+			
+			
+			}
+			
+			
+			private function startChimpTest(){
+			
+				var chimpWindow:ChimpWindow_v2 = new ChimpWindow_v2();
+				chimpWindow.open()			
+			}
+						
+			private function startIQTest(){
+				
+				var iqWindow:IQWindow = new IQWindow();
+				iqWindow.open()			
+			}
+			
+			private function startIndicatorTest(){
+				
+				var indicatorWindow:IndicatorWindow = new IndicatorWindow();
+				indicatorWindow.open()			
+			}
+			
+			//RESPONSE CLASS Functions
+			
+			private function connect(name:String, license:String):void {
+				//send license information
+				sdk.initializeLicense(name, license);
+			}
+			
+			private function handleLicenseEvent(event:LicenseEvent):void {
+				if (event.type == LicenseEvent.INVALID) {
+					trace("License invalid");
+				} else {
+					trace("License valid");
+					sdk.requestReceiverInfo(true);
+					sdk.stopPolling();
+				}
+			}
+			
+			private function handlePollEvent(event:PollEvent):void {
+				if (event.type == PollEvent.ERROR) {
+					trace(event.errorMessage);
+				} else if (event.type == PollEvent.STARTED) {
+					trace("Poll started");
+					//cboReceivers.enabled = false;
+				} else if (event.type == PollEvent.STOPPED) {
+					trace("Poll stopped");
+					//btnStart.enabled = sdk.isValid;
+					//btnStop.enabled = false;
+					//cboReceivers.enabled = true;
+				} 
+			}
+			
+			private function handleReceiverChannelEvent(event:ReceiverChannelEvent):void {
+				if (event.type == ReceiverChannelEvent.CHANGED) {
+					trace("Channel changed successfully");
+					//cboReceivers.selectedItem.channel = channel.text;
+				} else {
+					trace(event.errorMessage);
+				}
+			}
+			
+			private function handleReceiverError(event:ReceiverListEvent):void {
+				trace("Unable to connect to receivers:"+event.errorMessage);
+			}
+			
+			private function handleReceiverData(event:ReceiverListEvent):void {
+				var count:int = event.count;
+				if (event.count < 1) {
+					//cboReceivers.enabled = false;
+					return;
+				} 
+				//cboReceivers.enabled = true;
+				var i:int;
+				//receiverList = new Array(event.count-1);
+				for (i = 0; i < count; i++) {
+					//receiverList[i] = { label:event.getReceiverName(i), channel:event.getReceiverChannel(i) };
+				}
+			}
+			
+			private function receiverSelected(event:Event):void {
+				//channel.text = event.currentTarget.selectedItem.channel;
+			}
+			
+			
+			
+
+		]]>
+	</fx:Script>
+
+	<mx:Image source="assets/images/front_bg.jpg" x="0" y="0" />
+	<mx:HRule x="0" y="50" width="100%"/>
+	<mx:Image source="assets/images/front_02.jpg" x="0" y="67" id="chimpButton" click="startChimpTest()" buttonMode="true" alpha="0.7" rollOver="chimpButton.alpha = 1" rollOut="chimpButton.alpha = 0.7" />
+	<mx:Image source="assets/images/front_03.jpg" x="0" y="160" id="iqButton" click="startIQTest()" buttonMode="true" alpha="0.7" rollOver="iqButton.alpha = 1" rollOut="iqButton.alpha = 0.7" />
+	<mx:Image source="assets/images/front_03.jpg" x="0" y="253" id="iqButton2" click="startIndicatorTest()" buttonMode="true" alpha="0.7" rollOver="iqButton2.alpha = 1" rollOut="iqButton2.alpha = 0.7" />
+
+</s:WindowedApplication>

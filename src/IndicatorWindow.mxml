@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<components:Window showStatusBar="false" creationComplete="init()" xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:components="spark.components.*" width="1024" height="768">
+
+	<components:layout><s:BasicLayout /></components:layout>
+		
+	<fx:Script>
+		<![CDATA[
+			import com.greensock.TweenMax;
+			import com.turningtech.poll.PollService;
+			import com.turningtech.poll.event.ResponseEvent;
+			
+			import mx.collections.ArrayCollection;
+			
+			import org.gapminder.DistributionChart;
+				
+			
+			//response
+			private var sdk:PollService;
+			private var isPolling:Boolean = false;
+			
+			[Bindable]
+			public var rCount:int = 0;
+			
+			public var answers:Object;
+			
+			
+			
+			protected function init():void
+			{
+				
+				
+				//Poll
+				sdk = PollService.getInstance();
+				sdk.addEventListener(ResponseEvent.RESPONSE, handleResponse);
+				
+				// Center window on the screen
+				nativeWindow.x = (Capabilities.screenResolutionX - nativeWindow.width) / 2;
+				nativeWindow.y = (Capabilities.screenResolutionY - nativeWindow.height) / 2;
+					
+				
+				var dist:DistributionChart = new DistributionChart();
+				
+				chartContainer.addChild(dist);
+
+			}
+			
+	
+			private function toggleFullScreen():void {
+				if (stage.displayState == StageDisplayState.FULL_SCREEN) {
+					stage.displayState = StageDisplayState.NORMAL;
+					fullScreen.label = "Fullscreen";
+				} else {
+					stage.displayState = StageDisplayState.FULL_SCREEN;
+					fullScreen.label = "Exit Fullscreen";
+				}
+			}
+
+
+			
+			private function startPolling(e=null){
+				isPolling = true;
+				sdk.startPolling();
+				startPoll.label = "Stop poll";
+				startPoll.setStyle("chromeColor", "0xff00000");
+				startPoll.removeEventListener(MouseEvent.CLICK, startPolling);
+				startPoll.addEventListener(MouseEvent.CLICK, stopPolling);
+			}
+			
+		
+			
+			
+			private function stopPolling(e=null){
+				sdk.stopPolling();
+				startPoll.label = "Start poll";
+				startPoll.setStyle("chromeColor", "0x46AA48");
+				startPoll.removeEventListener(MouseEvent.CLICK, stopPolling);
+				startPoll.addEventListener(MouseEvent.CLICK, startPolling);
+				
+			}
+			
+			
+			
+			
+			public function clearResponseCount():void {
+				rCount = 0;
+			}
+
+			//RESPONSE
+			
+			private function handleResponse(event:ResponseEvent):void {
+				
+				var response:String = event.response;
+				var user:String = event.responseCardId;
+				
+				if(response == "1" || response == "2") {
+					
+					if(!(user in answers)) {
+						answers[user] = response;
+						rCount++;
+					}
+					else{
+						answers[user] = response;
+					}
+					
+					
+				}
+
+			}
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	<mx:Image source="assets/images/gapminder_interactive_01.jpg"/>
+	<s:Button fontSize="10" label	="Fullscreen" id="fullScreen" click="toggleFullScreen()" right="10" top="5" />
+	<mx:HRule x="0" y="50" width="100%"/>
+	<s:SpriteVisualElement id="chartContainer" y="500" x="20" />
+			
+			<s:Button label="Start poll" visible="true" id="startPoll" right="120" top="60" chromeColor="#46AA48" width="100" height="30" fontSize="15" color="#FFFFFF"/>
+			<s:Button label="Next" id="next" right="20" bottom="20" width="80" height="30" fontSize="15" color="#FFFFFF" chromeColor="#46AA48"/>
+			<s:Label text="{rCount} responses" visible="false" id="responseCount" fontSize="25" bottom="73" right="23" width="215" textAlign="right"/>
+			<s:Label text="Best" bottom="20" fontSize="45" left="30" id="bestScore" visible="false" />
+			<s:Label text="Average" bottom="20" fontSize="45" left="400" id="averageScore" visible="false" />
+		
+</components:Window>

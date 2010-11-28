@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" width="800" height="600" creationComplete="init()">
+	<s:layout>
+		<s:BasicLayout>
+			
+		</s:BasicLayout>
+	</s:layout>
+
+	
+	<fx:Script>
+		<![CDATA[
+			import org.gapminder.DistributionChart;
+			
+			public function init(){
+			
+				// Center window on the screen
+				nativeWindow.x = (Capabilities.screenResolutionX - nativeWindow.width) / 2;
+				nativeWindow.y = (Capabilities.screenResolutionY - nativeWindow.height) / 2;
+				
+				// Center window on the screen
+				nativeWindow.x = (Capabilities.screenResolutionX - nativeWindow.width) / 2;
+				nativeWindow.y = (Capabilities.screenResolutionY - nativeWindow.height) / 2;
+				
+				
+				//DIST CHART
+				
+				var distributionChart:DistributionChart = new DistributionChart();
+
+				holder.addChild(distributionChart);
+			}
+			
+		]]>
+	</fx:Script>
+		
+
+	<s:SpriteVisualElement id="holder" horizontalCenter="0">
+		
+	</s:SpriteVisualElement>
+	
+	
+</s:WindowedApplication>

@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<components:Window showStatusBar="false" creationComplete="init()" xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:components="spark.components.*" width="1280" height="800">
+	
+	
+	<components:layout>
+		<s:BasicLayout>
+	 	</s:BasicLayout>
+	</components:layout>
+		
+	<fx:Script>
+		<![CDATA[
+			import com.turningtech.poll.PollService;
+			import com.turningtech.poll.event.ResponseEvent;
+			
+			import nl.demonsters.debugger.MonsterDebugger;
+			
+			import org.gapminder.CustomEvent;
+			import org.gapminder.GameBoard;
+			
+			private var gameBoard:GameBoard;
+			private var sdk:PollService;
+
+			public var users:Object;	
+			public var userAnswers:Array;
+			private var mon:MonsterDebugger;
+			
+			protected function init():void
+			{
+			
+				
+				mon = new MonsterDebugger(this);
+				
+				sdk = PollService.getInstance();
+				
+				gameBoard = new GameBoard(this);
+				gameBoardHolder.addChild(gameBoard);
+				gameBoard.x = 0;
+				gameBoard.y = gameBoard.height/2
+		
+				
+				
+				// Center window on the screen
+				nativeWindow.x = (Capabilities.screenResolutionX - nativeWindow.width) / 2;
+				nativeWindow.y = (Capabilities.screenResolutionY - nativeWindow.height) / 2;
+				
+				// Center window on the screen
+				nativeWindow.x = (Capabilities.screenResolutionX - nativeWindow.width) / 2;
+				nativeWindow.y = (Capabilities.screenResolutionY - nativeWindow.height) / 2;
+				
+				addEventListener("BubbleSelected",bubbleClickHandler);
+				
+				toggleFullScreen();
+				
+			}
+			
+			
+			
+			private function toggleFullScreen():void {
+				if (stage.displayState == StageDisplayState.FULL_SCREEN) {
+					stage.displayState = StageDisplayState.NORMAL;
+					fullScreen.label = "Fullscreen";
+				} else {
+					stage.displayState = StageDisplayState.FULL_SCREEN;
+					fullScreen.label = "Exit Fullscreen";
+				}
+			}
+			
+			function bubbleClickHandler(e:CustomEvent){
+				pollLexButton.enabled = true;
+			}
+			
+			
+			function pollLexHandler(){
+				gameBoard.isPolling = true;
+				
+				initPolling();
+				startLexPolling();
+				
+				pollLexButton.enabled = false;
+				stopLexButton.enabled = true;
+				gameBoard.hideLabel("x");
+			}
+						
+			function stopLexHandler(){
+				stopLexButton.enabled = false;
+				pollTfrButton.enabled = true;
+				gameBoard.showLabels();
+				sdk.stopPolling();
+			}
+			
+			function pollTfrHandler(){
+				pollTfrButton.enabled = false;
+				stopTfrButton.enabled = true;
+				gameBoard.hideLabel("y");
+				startTfrPolling();
+			}
+			
+			function stopTfrHandler(){
+				stopTfrButton.enabled = false;
+				showResponsesButton.enabled = true;
+				gameBoard.showLabels();
+				sdk.stopPolling();
+			}
+			
+			function showResponsesHandler(){
+				showResponsesButton.enabled = false;
+				playButton.enabled = true;
+					
+				userAnswers = [];
+				
+				for (var user:String in users) {
+					
+					var lexAnswer = users[user].lex;
+					var tfrAnswer = users[user].tfr;
+					var tfrLength = users[user].tfr.length;
+
+					if(lexAnswer.length > 1 && tfrLength > 1) {
+					
+						var modLexAnswer:Number = Number(lexAnswer.substr(-2));						
+						var modTfrAnswer:Number = Number(tfrAnswer.charAt(tfrLength-2) + "." + tfrAnswer.charAt(tfrLength-1));
+						
+						if(modLexAnswer > 5 && modLexAnswer < 85 && modTfrAnswer > 0.5 && modTfrAnswer < 8.5 ) {
+						
+							var userAnswer = {};
+							userAnswer.id = user;
+							userAnswer.lex = modLexAnswer;
+							userAnswer.tfr = modTfrAnswer;
+							
+							userAnswers.push(userAnswer);
+						
+						}
+					}
+				}
+				
+				gameBoard.showAnswers(userAnswers);
+				
+			}
+
+			
+			function playHandler(){
+				gameBoard.startAnimaton()
+			}
+			
+			function resetHandler(){
+			
+			}
+
+			function initPolling() {
+				users = new Object();
+			}	
+			
+			function startLexPolling(){
+				sdk.addEventListener(ResponseEvent.RESPONSE, handleResponseLex);
+				sdk.startPolling()	
+			}
+				
+			function startTfrPolling(){
+				sdk.removeEventListener(ResponseEvent.RESPONSE, handleResponseLex);
+				sdk.addEventListener(ResponseEvent.RESPONSE, handleResponseTfr);
+				sdk.startPolling()	
+			}
+			
+			private function handleResponseLex(event:ResponseEvent):void {
+
+				var response:String = event.response;
+				var user:String = event.responseCardId;
+				
+				if (!(user in users)) {
+					users[user] = {};
+					users[user]["lex"] = "";
+					users[user]["tfr"] = "";
+				}	
+				
+				users[user]["lex"] += response;
+				
+			}
+			
+			private function handleResponseTfr(event:ResponseEvent):void {
+					
+					var response:String = event.response;
+					var user:String = event.responseCardId;
+					
+					users[user]["tfr"] += response;
+
+			}	
+
+		]]>
+	</fx:Script>
+	
+	
+	
+	<mx:Image source="assets/images/images/gapminder_interactive_01.jpg"/>
+	<s:Button fontSize="10" label="Fullscreen" id="fullScreen" click="toggleFullScreen()" right="10" top="5" />
+	<mx:HRule x="0" y="50" width="100%"/>
+
+			<s:SpriteVisualElement id="gameBoardHolder" horizontalCenter="0" />
+			
+	
+	<s:Button label="Poll LEX" enabled="false" id="pollLexButton" fontSize="15" bottom="20" left="50" click="pollLexHandler()" />
+	<s:Button label="Stop" enabled="false" id="stopLexButton" fontSize="15" bottom="20" left="150" click="stopLexHandler()" />
+	<s:Button label="Poll TFR" enabled="false" id="pollTfrButton" fontSize="15" bottom="20" left="250" click="pollTfrHandler()" />
+	<s:Button label="Stop" enabled="false" id="stopTfrButton" fontSize="15" bottom="20" left="350" click="stopTfrHandler()"  />
+	<s:Button label="Show responses" enabled="false" id="showResponsesButton" fontSize="15" bottom="20" left="500" click="showResponsesHandler()"  />
+	<s:Button label="Play" enabled="false" id="playButton" fontSize="15" bottom="20" left="700" click="playHandler()" />
+	<s:Button label="Reset" enabled="true" id="resetButton" fontSize="15" bottom="20" right="50" click="resetHandler()" />
+	
+</components:Window>

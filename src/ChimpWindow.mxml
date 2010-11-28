@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="utf-8"?>
+<components:Window showStatusBar="false" creationComplete="init()" xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:components="spark.components.*" width="1280" height="800">
+	
+	
+	<components:layout>
+		<s:BasicLayout>
+	 	</s:BasicLayout>
+	</components:layout>
+		
+	<fx:Script>
+		<![CDATA[
+			import com.greensock.TweenMax;
+			import com.turningtech.poll.PollService;
+			import com.turningtech.poll.event.ResponseEvent;
+			
+			import mx.containers.Canvas;
+			import mx.managers.PopUpManager;
+			
+			import org.gapminder.BarContainer;
+			import org.gapminder.DatabaseController;
+			import org.gapminder.QuestionPair_OLD;
+			
+			import spark.components.TextInput;
+			import spark.components.TitleWindow;
+			import spark.components.Window;
+			
+			
+			//response
+			private var sdk:PollService;
+			private var isPolling:Boolean = false;
+			
+			
+			//chimp test
+			private var _titleWindow:TitleWindow;
+			
+			//public var uniqueGroup:String = Math.ceil(Math.random()*50000).toString();
+			private var answers:Object = {};
+			private var _questionPairs:Array = [];
+			private var _isFinished:Boolean = false;
+			
+			[Bindable]
+			public var _activeQuestion:Number = -1;
+			
+			[Bindable]
+			public var rCount:int = 0;
+			
+			//questions
+			public var chimpQuestions:Array = [];
+			public var percentagesAlt1:Array = [];
+			
+			public var databaseController:DatabaseController = new DatabaseController();
+			
+			//visualization
+			private var barContainer:BarContainer;
+			
+				
+			protected function init():void
+			{
+				
+				sdk = PollService.getInstance();
+				sdk.addEventListener(ResponseEvent.RESPONSE, handleResponse);
+								
+				// Center window on the screen
+				nativeWindow.x = (Capabilities.screenResolutionX - nativeWindow.width) / 2;
+				nativeWindow.y = (Capabilities.screenResolutionY - nativeWindow.height) / 2;
+				
+				// Center window on the screen
+				nativeWindow.x = (Capabilities.screenResolutionX - nativeWindow.width) / 2;
+				nativeWindow.y = (Capabilities.screenResolutionY - nativeWindow.height) / 2;
+				
+				
+				//intro
+					
+				
+				
+				//Init Chimp test
+				chimpQuestions = databaseController.getQuestions();
+				
+				var i:Number = 0;
+				
+				for each(var question:Object in chimpQuestions)
+				{
+					//New pairs
+					var questionPair:QuestionPair_OLD = new QuestionPair_OLD(question.alt1, question.alt2);
+					questionPair.y = i*70;
+					questionPair.x = 0;
+					questionPair.scaleX = 0.9;
+					questionPair.scaleY = 0.9;
+					
+					
+					_questionPairs.push(questionPair);
+					
+					//chimpStack.rawChildren.addChild(questionPair);
+					
+					i++;
+					
+					questionHolder.addChild(questionPair);
+					
+				}
+				
+				
+				nextQuestion();
+				startPoll.addEventListener(MouseEvent.CLICK, startPolling);
+				next.addEventListener(MouseEvent.CLICK, endQuestion);
+				
+				openModalWindow();
+				
+			}
+			
+			
+			public function openModalWindow():void
+			{
+				
+				//define title window
+				_titleWindow = new TitleWindow();
+				_titleWindow.title = "Group name";
+				
+				//define and add canvas
+				var _tmpCanvas:Canvas = new Canvas();
+				_tmpCanvas.height = 100;
+				_tmpCanvas.width = 200;
+				_titleWindow.addElement(_tmpCanvas);
+				
+				//define and add label
+				var _uniqueGroupText:TextInput = new TextInput();
+				_uniqueGroupText.name = "uniqueGroupText";
+				_uniqueGroupText.left = 10;
+				_uniqueGroupText.top = 10;
+				_tmpCanvas.addElement(_uniqueGroupText);
+				
+				var okButton:Button = new Button();
+				okButton.label = "OK";
+				okButton.bottom = 10;
+				okButton.right = 10;
+				okButton.addEventListener(MouseEvent.CLICK, closeModalWindow);
+				
+				_tmpCanvas.addElement(okButton);
+				
+				//add modal window
+				PopUpManager.addPopUp(_titleWindow, this,true);
+				//center modal window
+				PopUpManager.centerPopUp(_titleWindow);
+				
+				function closeModalWindow(e:MouseEvent){
+					
+					if(_uniqueGroupText.text != "") {
+						databaseController.uniqueGroup = _uniqueGroupText.text;
+						PopUpManager.removePopUp(_titleWindow);
+					}
+					
+				}
+			}
+			
+			
+			private function toggleFullScreen():void {
+				if (stage.displayState == StageDisplayState.FULL_SCREEN) {
+					stage.displayState = StageDisplayState.NORMAL;
+					fullScreen.label = "Fullscreen";
+				} else {
+					stage.displayState = StageDisplayState.FULL_SCREEN;
+					fullScreen.label = "Exit Fullscreen";
+				}
+			}
+
+			
+			
+			private function endQuestion(e:MouseEvent):void {
+				//if(isPolling) stopPolling();
+				var percentageAlt1:Number = databaseController.handleAnswers(answers, chimpQuestions[_activeQuestion].id, chimpQuestions[_activeQuestion].correct); //send all answers, question ID and correct
+				
+				percentagesAlt1.push(percentageAlt1);
+				
+				answers = new Object();
+				nextQuestion();
+			}
+			
+			
+			private function nextQuestion():void {
+				
+				_activeQuestion++;
+				clearResponseCount();
+				
+				if(!_isFinished) {
+					
+					for each(var questionPair:Object in _questionPairs) {
+						questionPair.gotoAndStop(1);
+						questionPair.alt1.textColor = "0xcccccc";
+						questionPair.alt2.textColor = "0xcccccc";
+						
+					}
+					
+					_questionPairs[_activeQuestion].gotoAndStop(2);
+					_questionPairs[_activeQuestion].alt1.textColor = "0x000000";
+					_questionPairs[_activeQuestion].alt2.textColor = "0x000000";
+					
+					
+					if(_activeQuestion == chimpQuestions.length-1) {
+						_isFinished = true;
+					}
+					
+				}
+					
+				else {
+					
+					for each(var questionPair:Object in _questionPairs) {
+						questionPair.gotoAndStop(1);
+						questionPair.alt1.textColor = "0x000000";
+						questionPair.alt2.textColor = "0x000000";
+						
+					}
+					initResults()
+					
+				}
+				
+			}
+			
+			
+			
+			private function startPolling(e:MouseEvent){
+				isPolling = true;
+				sdk.startPolling();
+				startPoll.label = "Stop poll";
+				startPoll.setStyle("chromeColor", "0xff00000");
+				startPoll.removeEventListener(MouseEvent.CLICK, startPolling);
+				startPoll.addEventListener(MouseEvent.CLICK, stopPolling);
+			}
+			
+			
+			private function stopPolling(e=null){
+				sdk.stopPolling();
+				startPoll.label = "Start poll";
+				startPoll.setStyle("chromeColor", "0x46AA48");
+				startPoll.removeEventListener(MouseEvent.CLICK, stopPolling);
+				startPoll.addEventListener(MouseEvent.CLICK, startPolling);
+				
+			}
+			
+			
+			//RESULTS in %
+			
+			private function initResults(){
+				
+				testHeading.text = "How did we guess?";
+				
+				TweenMax.allTo([startPoll,responseCount],0.2,{autoAlpha: 0});
+				_activeQuestion = 0;
+				
+				var alt1Array:Array = new Array();
+				var alt2Array:Array = new Array();
+				
+				for each (var question:MovieClip in _questionPairs) {
+					alt1Array.push(question.alt1);
+					alt2Array.push(question.alt2);
+				}
+				
+				TweenMax.allTo(alt1Array, 0.2, {x:"-60"}, 0.05);
+				TweenMax.allTo(alt2Array, 0.2, {x:"+60"}, 0.05); 
+				
+				//next.label = "Show next result";
+				
+				next.removeEventListener(MouseEvent.CLICK, endQuestion);
+				next.addEventListener(MouseEvent.CLICK, nextResultHandler);
+			}
+			
+			private function nextResultHandler(e:MouseEvent){
+				
+				if(_activeQuestion < chimpQuestions.length) {
+				
+				var percentageAlt1:Number = percentagesAlt1[_activeQuestion];
+			
+				_questionPairs[_activeQuestion].showResult(percentageAlt1);
+				
+				_questionPairs[_activeQuestion].alt1.textColor = "0x000000";
+				_questionPairs[_activeQuestion].alt2.textColor = "0x000000";
+				
+				
+				next.removeEventListener(MouseEvent.CLICK, nextResultHandler);
+				next.addEventListener(MouseEvent.CLICK, markCorrectAnswer);
+
+					
+				}
+				
+			}
+			
+			private function markCorrectAnswer(e:MouseEvent){
+				if(chimpQuestions[_activeQuestion].correct == 1) {
+					_questionPairs[_activeQuestion].alt2.alpha = 0.2;
+				}
+					
+				else{
+					_questionPairs[_activeQuestion].alt1.alpha = 0.2;
+				}
+				
+				next.removeEventListener(MouseEvent.CLICK, markCorrectAnswer);
+				next.addEventListener(MouseEvent.CLICK, nextResultHandler);
+				
+				_activeQuestion++;
+			
+			}
+			
+			
+			//VISUALIZATION
+			
+			private function buildVisualization(){
+				barContainer = new BarContainer(databaseController.getResults());
+				visualizationHolder.addChild(barContainer);
+				barContainer.x = -(barContainer.width/2);
+			}
+			
+			private function toggleChimpPhoto(){
+				if(chimpPhoto.alpha == 0) {
+					TweenMax.to(chimpPhoto, 0.2, {autoAlpha: 1});
+				}
+				else{
+					TweenMax.to(chimpPhoto, 0.2, {autoAlpha: 0});
+				}
+			
+			}
+			
+			private function toggleChimpResults(){
+				
+				var a = 1;
+			}
+			
+			public function clearResponseCount():void {
+				rCount = 0;
+			}
+			
+			//RESPONSE
+			
+			private function handleResponse(event:ResponseEvent):void {
+				
+				var response:String = event.response;
+				var user:String = event.responseCardId;
+				
+				if(response == "1" || response == "2") {
+					
+					if(!(user in answers)) {
+						answers[user] = response;
+						rCount++;
+					}
+					else{
+						answers[user] = response;
+					}
+				}
+				
+				trace(answers)
+				
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	
+	<mx:Image source="assets/images/gapminder_interactive_01.jpg"/>
+	<s:Button fontSize="10" label="Fullscreen" id="fullScreen" click="toggleFullScreen()" right="10" top="5" />
+	<mx:HRule x="0" y="50" width="100%"/>
+	<mx:ViewStack id="chimpStack" creationPolicy="all" width="100%" height="713">
+		<s:NavigatorContent creationPolicy="all" label="Intro" id="intro" width="100%" height="90%">
+			<s:SpriteVisualElement id="introHolder" />
+			<s:Label y="70" text="How does this work!?" horizontalCenter="0" fontSize="45" fontFamily="Arial" verticalAlign="top" textAlign="center" width="1055"/>
+			<mx:Image y="220" source="assets/images/ResponseCard_samll_white.jpg" horizontalCenter="0"/>
+		</s:NavigatorContent>
+		<s:NavigatorContent creationPolicy="all" label="The Test" id="chimpTest" width="100%" height="100%">
+			<s:SpriteVisualElement id="questionHolder" top="150" horizontalCenter="0" />
+			<s:Button label="Start poll" id="startPoll" right="120" bottom="-80" chromeColor="#46AA48" width="100" height="30" fontSize="15" color="#FFFFFF"/>
+			<s:Button label="Next" id="next" right="20" bottom="-80" width="80" height="30" fontSize="15" color="#FFFFFF" chromeColor="#46AA48"/>
+			<s:Label text="{rCount} responses" id="responseCount" fontSize="25" bottom="-40" right="20" width="215" textAlign="right"/>
+			<s:Label y="70" id="testHeading" text="Which country has higher child mortality?" horizontalCenter="0" verticalAlign="top" fontSize="45" fontFamily="Arial" textAlign="center" width="1055"/>
+		</s:NavigatorContent>
+		<s:NavigatorContent creationPolicy="all" label="Group results" id="chimpResults" width="100%" height="100%">
+			<s:Label y="70" text="Your results&#xd;&#xd;" horizontalCenter="-4" verticalAlign="top" textAlign="center" width="1055" fontSize="45" fontFamily="Arial" />
+			<s:SpriteVisualElement id="visualizationHolder" horizontalCenter="0" bottom="100"/>
+			<s:Button label="Show line" id="showResults" click="buildVisualization()" left="20" top="100"/>
+			<s:Button label="Show group results" id="showResults2" click="barContainer.showBlocks()" left="20" top="130"/>
+			<s:Button label="Toggle other groups results" id="chimpResultsButton" click="toggleChimpResults()" left="20" top="160"/>
+			<s:Button label="Toggle photo" id="chimpPhotoButton" click="toggleChimpPhoto()" left="20" top="190"/>
+			<s:Label bottom="20" right="80" text="correct answers" fontSize="25"/>
+			<mx:Image y="30" right="0" source="assets/images/chimp_polaroid.png" alpha="0" id="chimpPhoto" width="400" height="286"/>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	<mx:ToggleButtonBar dataProvider="{chimpStack}" width="512" height="30" fontSize="12" bottom="5" left="10" dropShadowVisible="false" borderVisible="true" chromeColor="#FFFFFF">
+	</mx:ToggleButtonBar>	
+</components:Window>

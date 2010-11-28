@@ -1,0 +1,25 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+
+@font-face {
+	src: url("assets/fonts/Qlassik_TB.otf");
+	fontFamily: Qlassik;
+	advancedAntiAliasing: true;
+	emedAsCFF: false;
+}
+
+
+global
+{
+	font-size: 20;
+	font-family: "Arial";
+}
+
+s|label
+{
+	font-size: 50;
+	font-family: "Qlassik";
+}
+
